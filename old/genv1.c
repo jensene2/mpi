@@ -1,4 +1,3 @@
- // required MPI include file
 #include "mpi.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,8 +7,7 @@
 #include <iostream>
 #include <string>
 using namespace std;
-void permute(list<list<int>> result, list<int> current, list<int> left);
-int algorithm(int number);
+int algorithm();
    int main(int argc, char *argv[])
 	{
 	char hostname[MPI_MAX_PROCESSOR_NAME];
@@ -42,10 +40,10 @@ int algorithm(int number);
 				char del = ' ';
 				for(int i = 0; i < number*number; i++)
 				{
-				//	printf("%c%d", del, array[i]);
+					printf("%c%d", del, array[i]);
 					del = ',';
 				}
-				//puts("");
+				puts("");
 			}
 
 
@@ -54,23 +52,13 @@ int algorithm(int number);
 		{
     			MPI_Recv(&number, 1, MPI_INT, 0, 0, MPI_COMM_WORLD,MPI_STATUS_IGNORE);
 			array = (int *)malloc(sizeof(int) * number * number);
-			list<int> l;
 			array[0] = world_rank -1;
-			l.push_front(array[0]);
-			for(int i = 0; i < number; i++)
-			{
-				if(i != array[0])
-				l.push_back(i);
-			}
 			for(int i = 1; i < number * number;i++)
 			{
 				array[i] = -1;
 			}
 			//an algorithm goes here!!
-			//algorithm(number);
-			list<list<int>> result;
-			list<int> empty;
-			permute(result,empty, l);  
+			algorithm();
 			MPI_Send(array, number * number, MPI_INT, 0, 0, MPI_COMM_WORLD);
 		}
 	printf ("Number of tasks= %d My rank= %d Running on %s\n", world_size,world_rank,hostname);
@@ -78,39 +66,12 @@ int algorithm(int number);
    // done with MPI
    MPI_Finalize();
    }
- 
-/* print permutations of string */
-void permute(list<list<int>> result, list<int> current, list<int> left)
+
+int algorithm()
 {
-	if(left.empty())
-	{
-		result.push_front(current);	
-		for(int j: current)
-		{
-			cout << j << ",";
-		}
-		cout << endl;
-	}
-	else
-	{
-		list<int> left2(left);
-		for(int i : left2)
-		{
-			list<int> newCurrent (current);
-			list<int> newleft (left);
-			newleft.remove(i);
-			newCurrent.push_back(i);
-			permute(result,newCurrent,newleft);
-			/*for(int j: newleft)
-			{
-				cout << "xx="<<j;
-			}	
-			cout << endl;*/
-		}
-	}
-}
-int algorithm(int count)
-{
+ //GList* list = NULL;
+ //list = g_list_append(list, "Hello world!");
+ //printf("The first item is '%s'\n", g_list_first(list)->data);
 	map<int,list<int>> map;
 	list<int> list1;
 	list1.push_front(1);
