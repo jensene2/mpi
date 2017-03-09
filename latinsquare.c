@@ -3,8 +3,9 @@
 #define __LATINSQUARE_C_INCLUDED__
 
 // Include dependencies.
-#include <vector>
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
 using namespace std;
 class LatinSquare {
@@ -30,24 +31,24 @@ public:
         this->size = std::sqrt(body.size());
     }
 
-    vector<int> getColumn(int x) {
-        vector<int> column;
-
-        for (int y = 0; y < this->size; y++) {
-            column.push_back(this->get(x, y));
-        }
-
-        return column;
-    }
-
-    vector<int> getRow(int y) {
+    vector<int> getRow(int x) {
         vector<int> row;
 
-        for (int x = 0; x < this->size; x++) {
+        for (int y = 0; y < this->size; y++) {
             row.push_back(this->get(x, y));
         }
 
         return row;
+    }
+
+    vector<int> getColumn(int y) {
+        vector<int> column;
+
+        for (int x = 0; x < this->size; x++) {
+            column.push_back(this->get(x, y));
+        }
+
+        return column;
     }
 
     int getFirstUnfinishedRowCoordinate() {
@@ -90,13 +91,28 @@ public:
     }
 
     bool isValid() {
-        // --------------------------------------------------------------------------------------
-        //
-        // TO DO: Write the code to check if a square is valid.
-        // For now, sure. It's valid.
+		vector<int> row;
+		vector<int> column;
+
+		for (int i = 0; i < this->getSize(); i++) {
+			row = getRow(i);
+			column = getColumn(i);
+
+			sort(row.begin(), row.end());
+			sort(column.begin(), column.end());
+
+			for (int j = 0; j < row.size()-1; j++) {
+				if (row[j] == row[j+1] && row[j] != -1) {
+					return false;
+				}
+
+				if (column[j] == column[j+1] && column[j] != -1) {
+					return false;
+				}
+			}
+		}
+
         return true;
-        //
-        // --------------------------------------------------------------------------------------
     }
 
     vector<int> getBody() {

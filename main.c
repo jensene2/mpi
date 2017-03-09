@@ -1,5 +1,7 @@
 #include "mpi.h"
 #include <algorithm>
+#include <cmath>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -13,6 +15,8 @@ LatinSquare receiveLatinSquare(int size, int source, int tag);
 void sendLatinSquare(LatinSquare square, int source, int tag);
 void coordinator(int size, int worldSize);
 void worker(int size);
+void clean();
+void setup();
 
 int main(int argc, char *argv[]) {
     // Creates a char array, aka a string.
@@ -36,7 +40,15 @@ int main(int argc, char *argv[]) {
         // Share the size with the workers.
         MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
+		// Setup.
+		// If any of this fails, this should be changed to gracefully crash.
+		setup();
+
+		// Run coordinator.
         coordinator(size, worldSize);
+
+		// Clean up.
+		clean();
     } else if (worldRank != 0) {
         // Receive the size and share with other workers.
         MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -44,12 +56,20 @@ int main(int argc, char *argv[]) {
         worker(size);
     }
 
-    // MPI Cleanup.
-    MPI_Finalize();
+		// MPI Cleanup.
+		MPI_Finalize();
+}
+
+void setup() {
+	setupQueue();
+}
+
+void clean() {
+	cleanQueue();
 }
 
 void coordinator(int size, int worldSize) {
-    MPI_Send(&size, 1, MPI_INT, 1, 1, MPI_COMM_WORLD);
+	// Create an initial empty latin square.
     LatinSquare square = LatinSquare(size);
 
     // For now assume reduced latin squares. So force this one to be reduced.
@@ -65,7 +85,6 @@ void coordinator(int size, int worldSize) {
     queue.push(square);
 
     int count = 0;
-
     while (!queue.isEmpty()) {
         int workersDispatched = 0;
 
@@ -73,12 +92,33 @@ void coordinator(int size, int worldSize) {
         //   workers or the queue is empty. Duplicate the !queue.isEmpty()
         //   here because there are two exit conditions for this loop.
         for (int i = 1; !queue.isEmpty() && i < worldSize; i++) {
+			// Get a square.
+			// cout << "Getting a square." << endl;
+            square = queue.get();
+
+			// cout << "Received square from queue." << endl;
+			// for (int x = 0; x < square.getSize(); x++) {
+			// 	for (int y = 0; y < square.getSize(); y++) {
+			// 		cout << square.get(x, y) << " ";
+			// 	}
+			// 	cout << endl;
+			// }
+			// cout << endl;
 
             // Make sure not to send empty squares;
-            square = queue.get();
             if (square.isEmpty()) {
+				// cout << "Ooops, it's empty." << endl;
                 continue;
             }
+
+			// cout << "Sending square." << endl;
+			// for (int x = 0; x < square.getSize(); x++) {
+			// 	for (int y = 0; y < square.getSize(); y++) {
+			// 		cout << square.get(x, y) << " ";
+			// 	}
+			// 	cout << endl;
+			// }
+			// cout << endl;
 
             sendLatinSquare(square, i, 0);
             workersDispatched++;
@@ -89,6 +129,15 @@ void coordinator(int size, int worldSize) {
         while (workersDispatched != 0) {
             square = receiveLatinSquare(size, MPI_ANY_SOURCE, 0);
 
+			// cout << "Received square from worker." << endl;
+			// for (int x = 0; x < square.getSize(); x++) {
+			// 	for (int y = 0; y < square.getSize(); y++) {
+			// 		cout << square.get(x, y) << " ";
+			// 	}
+			// 	cout << endl;
+			// }
+			// cout << endl;
+
             if (square.isFinished()) {
                 count++;
 
@@ -98,13 +147,17 @@ void coordinator(int size, int worldSize) {
                 // For now, do nothing.
                 //
                 // --------------------------------------------------------------------------------------
-            } else {
-                queue.push(square);
 
+            } else {
+				// If the square received is empty, then the worker finished.
                 if (square.isEmpty()) {
                     workersDispatched--;
-                }
+                } else {
+					queue.push(square);
+				}
             }
+
+			// cout << "Queue isEmpty: " << queue.isEmpty() << endl;
         }
     }
 
@@ -124,11 +177,17 @@ void coordinator(int size, int worldSize) {
 }
 
 void worker(int size) {
-    // Receive size from the coordinator.
-    MPI_Recv(&size, 1, MPI_INT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
     // Receive a square from the coordinator.
     LatinSquare square = receiveLatinSquare(size, 0, 0);
+
+	// cout << "Received square from coordinator." << endl;
+	// for (int x = 0; x < square.getSize(); x++) {
+	// 	for (int y = 0; y < square.getSize(); y++) {
+	// 		cout << square.get(x, y) << " ";
+	// 	}
+	// 	cout << endl;
+	// }
+	// cout << endl;
 
     // Start a loop that runs until an empty latin square is received.
     while (!square.isEmpty()) {
@@ -147,23 +206,23 @@ void worker(int size) {
         //   Who could have guessed that?
         do {
             for (int i = 0; i < size; i++) {
-                square.set(i, rowCoordinate, row[i]);
+                square.set(rowCoordinate, i, row[i]);
             }
+
+			// cout << "Testing square." << endl;
+			// for (int x = 0; x < square.getSize(); x++) {
+			// 	for (int y = 0; y < square.getSize(); y++) {
+			// 		cout << square.get(x, y) << " ";
+			// 	}
+			// 	cout << endl;
+			// }
+			// cout << endl;
 
             // Check if square is valid.
             if (square.isValid()) {
                 sendLatinSquare(square, 0, 0);
             }
         } while (std::next_permutation(row.begin(), row.end()));
-
-        // Excuse my python.
-        // for row in rowPossibilities:
-            // Finish the unfinished row with all possibilities.
-
-
-            // Apply the possibilities.
-            // Check if it's a valid possibility.
-            // Send the new square back if it is valid.
 
         // Get a new square to work on. Alert the coordinator by sending an
         //   empty latin square.
