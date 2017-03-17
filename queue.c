@@ -25,15 +25,20 @@ char directory[] = "./queue/";
 
 using namespace std;
 class Queue {
+	int id;
 public:
-    void push(LatinSquare square) {
+	Queue(int id) {
+		this->id = id;
+	}
+
+	void push(LatinSquare square) {
 		struct timeval tv;
 		gettimeofday(&tv, NULL); // TO DO: Check the error on this.
 		unsigned long long microtime = 1000000 * tv.tv_sec + tv.tv_usec;
 
 		vector<int> body = square.getBody();
 		char str[30];
-		sprintf(str, "%s%llu", directory, microtime);
+		sprintf(str, "%s%d-%llu", directory, this->id, microtime);
 
 		ofstream tmpfile (str, ofstream::out);
 		for (int i = 0; i < body.size()-1; i++) {
@@ -44,9 +49,9 @@ public:
 
 		tmpfile.flush();
 		tmpfile.close();
-    }
+	}
 
-    LatinSquare get() {
+	LatinSquare get() {
 		DIR *d;
 		struct dirent *dir;
 		vector<int> v;
@@ -88,9 +93,9 @@ public:
 		}
 
 		return LatinSquare(1);
-    }
+	}
 
-    bool isEmpty() {
+	bool isEmpty() {
 		DIR *d;
 		struct dirent *dir;
 
@@ -115,7 +120,7 @@ public:
 		}
 
 		return true;
-    }
+	}
 };
 
 void setupQueue() {

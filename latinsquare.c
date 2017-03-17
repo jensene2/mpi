@@ -9,88 +9,100 @@
 
 using namespace std;
 class LatinSquare {
-    // Use a one dimensional array to hold the body to make it easier to send.
-    vector<int> body;
+	// Use a one dimensional array to hold the body to make it easier to send.
+	vector<int> body;
 
-    // Store the size rather than computing square roots whenever it's needed.
-    int size;
+	// Store the size rather than computing square roots whenever it's needed.
+	int size;
 public:
-    LatinSquare(int size) {
-        this->size = size;
+	LatinSquare(int size) {
+		this->size = size;
 
-        for (int x = 0; x < size; x++) {
-            for (int y = 0; y < size; y++) {
-                this->body.push_back(-1);
-            }
-        }
-    }
+		for (int x = 0; x < size; x++) {
+			for (int y = 0; y < size; y++) {
+				this->body.push_back(-1);
+			}
+		}
+	}
 
-    LatinSquare(std::vector<int> body) {
-        this->body = body;
+	LatinSquare(std::vector<int> body) {
+		this->body = body;
 
-        this->size = std::sqrt(body.size());
-    }
+		this->size = std::sqrt(body.size());
+	}
 
-    vector<int> getRow(int x) {
-        vector<int> row;
+	static LatinSquare createHalter(int size) {
+		LatinSquare square = LatinSquare(size);
 
-        for (int y = 0; y < this->size; y++) {
-            row.push_back(this->get(x, y));
-        }
+		square.set(0, 0, -2);
 
-        return row;
-    }
+		return square;
+	}
 
-    vector<int> getColumn(int y) {
-        vector<int> column;
+	vector<int> getRow(int x) {
+		vector<int> row;
 
-        for (int x = 0; x < this->size; x++) {
-            column.push_back(this->get(x, y));
-        }
+		for (int y = 0; y < this->size; y++) {
+			row.push_back(this->get(x, y));
+		}
 
-        return column;
-    }
+		return row;
+	}
 
-    int getFirstUnfinishedRowCoordinate() {
-        for (int y = 0; y < this->size; y++) {
-            for (int i : this->getRow(y)) {
-                if (i == -1) {
-                    return y;
-                }
-            }
-        }
-    }
+	vector<int> getColumn(int y) {
+		vector<int> column;
 
-    int get(int x, int y) {
-        // x * size + y
-        return this->body[(x * this->size) + y];
-    }
+		for (int x = 0; x < this->size; x++) {
+			column.push_back(this->get(x, y));
+		}
 
-    void set(int x, int y, int value) {
-        this->body[(x * this->size) + y] = value;
-    }
+		return column;
+	}
 
-    bool isFinished() {
-        for (int i = 0; i < this->body.size(); i++) {
-            if (this->body[(i)] == -1) {
-                return false;
-            }
-        }
+	int getFirstUnfinishedRowCoordinate() {
+		for (int y = 0; y < this->size; y++) {
+			for (int i : this->getRow(y)) {
+				if (i == -1) {
+					return y;
+				}
+			}
+		}
+	}
 
-        return true;
-    }
+	int get(int x, int y) {
+		// x * size + y
+		return this->body[(x * this->size) + y];
+	}
 
-    bool isEmpty() {
-        for (int i = 0; i < this->body.size(); i++) {
-            if (this->body[i] != -1) {
-                return false;
-            }
-        }
+	void set(int x, int y, int value) {
+		this->body[(x * this->size) + y] = value;
+	}
 
-        return true;
-    }
+	bool isFinished() {
+		for (int i = 0; i < this->body.size(); i++) {
+			if (this->body[(i)] == -1) {
+				return false;
+			}
+		}
 
-    bool isValid() {
+		return true;
+	}
+
+	bool isEmpty() {
+		for (int i = 0; i < this->body.size(); i++) {
+			if (this->body[i] != -1) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool isHalter() {
+		return (this->get(0, 0) == -2);
+	}
+
+	bool isValid() {
 		vector<int> row;
 		vector<int> column;
 
@@ -112,16 +124,16 @@ public:
 			}
 		}
 
-        return true;
-    }
+		return true;
+	}
 
-    vector<int> getBody() {
-        return this->body;
-    }
+	vector<int> getBody() {
+		return this->body;
+	}
 
-    int getSize() {
-        return this->size;
-    }
+	int getSize() {
+		return this->size;
+	}
 };
 
 #endif

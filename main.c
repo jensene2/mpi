@@ -5,253 +5,129 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sstream>
 
-#include "latinsquare.c"
-#include "queue.c"
+// #include "latinsquare.c"
+// #include "queue.c"
+
+#include "coordinator.c"
+#include "receiver.c"
+#include "worker.c"
 
 using namespace std;
 
-LatinSquare receiveLatinSquare(int size, int source, int tag);
-void sendLatinSquare(LatinSquare square, int source, int tag);
-void coordinator(int size, int worldSize);
-void worker(int size);
-void clean();
-void setup();
+// LatinSquare receiveLatinSquare(int size, int source, int tag);
+// void sendLatinSquare(LatinSquare square, int source, int tag);
+// void coordinator(int size, int worldSize);
+// void worker(int size);
+// void clean();
+// void setup();
 
 int main(int argc, char *argv[]) {
-    // Creates a char array, aka a string.
-    char hostname[MPI_MAX_PROCESSOR_NAME];
+	// Creates a char array, aka a string.
+	char hostname[MPI_MAX_PROCESSOR_NAME];
 
-    // MPI Setup.
-    int resultLength, worldRank, worldSize;
-    MPI_Init(&argc, &argv);
-    MPI_Get_processor_name(hostname, &resultLength);
-    MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
-    MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
-    // printf ("Number of tasks= %d My rank= %d Running on %s\n", worldSize, worldRank, hostname);
+	// MPI Setup.
+	int resultLength, worldRank, worldSize;
+	MPI_Init(&argc, &argv);
+	MPI_Get_processor_name(hostname, &resultLength);
+	MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
+	MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
 
-    // Designate by rank. 0 is the coordinator, the rest are workers.
-    int size;
-    if (worldRank == 0) {
-        // Get the size.
-        printf("Enter the size: ");
-        scanf("%d", &size);
+	int numReceivers = worldSize / 10;
+	if (numReceivers == 0) {
+		numReceivers = 1;
+	}
 
-        // Share the size with the workers.
-        MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	vector<int> receiverRanks, workerRanks;
+	for (int i = 0; i < worldSize; i++) {
+		if (i <= numReceivers) {
+			receiverRanks.push_back(i);
+		} else {
+			workerRanks.push_back(i);
+		}
+	}
 
-		// Setup.
-		// If any of this fails, this should be changed to gracefully crash.
-		setup();
+	MPI_Group worldGroup;
+	MPI_Comm_group(MPI_COMM_WORLD, &worldGroup);
 
-		// Run coordinator.
-        coordinator(size, worldSize);
+	MPI_Group receiverGroup, workerGroup;
+	MPI_Group_incl(worldGroup, receiverRanks.size(), &receiverRanks[0], &receiverGroup);
+	MPI_Group_incl(worldGroup, workerRanks.size(), &workerRanks[0], &workerGroup);
 
-		// Clean up.
-		clean();
-    } else if (worldRank != 0) {
-        // Receive the size and share with other workers.
-        MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	MPI_Comm receivers, workers, row;
+	MPI_Comm_create_group(MPI_COMM_WORLD, receiverGroup, 0, &receivers);
+	MPI_Comm_create_group(MPI_COMM_WORLD, workerGroup, 0, &workers);
 
-        worker(size);
-    }
+	// Set up the row communicators.
+	if (worldRank == 0) {
+		// The coordinator receives its own color so it isn't involved with
+		//   any other node.
+		MPI_Comm_split(MPI_COMM_WORLD, numReceivers, 0, &row);
+	} else {
+		if (worldRank <= numReceivers) {
+			MPI_Comm_split(MPI_COMM_WORLD, worldRank % numReceivers, 0, &row);
+		} else {
+			MPI_Comm_split(MPI_COMM_WORLD, worldRank % numReceivers, worldRank, &row);
+		}
+	}
 
-		// MPI Cleanup.
-		MPI_Finalize();
-}
+	int size;
+	if (worldRank == 0) {
+		if (argc < 2) {
+			cout << "A size argument is required." << endl;
+			return 1;
+		}
+		istringstream ss(argv[1]);
+		if (!(ss >> size)) {
+			size = 0;
+		}
 
-void setup() {
-	setupQueue();
-}
+		MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		if (size < 1) {
+			cout << "The size must be an integer greater than 0." << endl;
+			return 1;
+		}
 
-void clean() {
-	cleanQueue();
-}
+		Coordinator coordinator = Coordinator(size, &receivers);
+		coordinator.setup();
+		coordinator.run();
+		coordinator.shutdown();
+		coordinator.clean();
+	} else {
+		if (argc < 2) {
+			return 1;
+		}
 
-void coordinator(int size, int worldSize) {
-	// Create an initial empty latin square.
-    LatinSquare square = LatinSquare(size);
+		MPI_Bcast(&size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+		if (size < 1) {
+			return 1;
+		}
 
-    // For now assume reduced latin squares. So force this one to be reduced.
-    for (int i = 0; i < size; i++) {
-        square.set(0, i, i);
-        square.set(i, 0, i);
-    }
+		if (worldRank <= numReceivers) {
+			Receiver receiver = Receiver(size, &receivers, &row);
+			receiver.run();
+			receiver.shutdown();
+		} else {
+			Worker worker = Worker(size, &row);
+			worker.run();
+			worker.shutdown();
+		}
+	}
 
-    // Keeping a count would be a pain to manage because of potential overflow.
-    //   Instead, use a Queue object that can push and retrieve latin squares
-    //   and has a isEmpty() method as a stopping condition.
-    Queue queue = Queue();
-    queue.push(square);
+	// MPI Cleanup.
+	MPI_Group_free(&receiverGroup);
+	MPI_Group_free(&workerGroup);
 
-    int count = 0;
-    while (!queue.isEmpty()) {
-        int workersDispatched = 0;
+	if (receivers != MPI_COMM_NULL) {
+		MPI_Comm_free(&receivers);
+	}
+	if (workers != MPI_COMM_NULL) {
+		MPI_Comm_free(&workers);
+	}
+	if (row != MPI_COMM_NULL) {
+		MPI_Comm_free(&row);
+	}
 
-        // Send latin squares to all workers until either there are no free
-        //   workers or the queue is empty. Duplicate the !queue.isEmpty()
-        //   here because there are two exit conditions for this loop.
-        for (int i = 1; !queue.isEmpty() && i < worldSize; i++) {
-			// Get a square.
-			// cout << "Getting a square." << endl;
-            square = queue.get();
-
-			// cout << "Received square from queue." << endl;
-			// for (int x = 0; x < square.getSize(); x++) {
-			// 	for (int y = 0; y < square.getSize(); y++) {
-			// 		cout << square.get(x, y) << " ";
-			// 	}
-			// 	cout << endl;
-			// }
-			// cout << endl;
-
-            // Make sure not to send empty squares;
-            if (square.isEmpty()) {
-				// cout << "Ooops, it's empty." << endl;
-                continue;
-            }
-
-			// cout << "Sending square." << endl;
-			// for (int x = 0; x < square.getSize(); x++) {
-			// 	for (int y = 0; y < square.getSize(); y++) {
-			// 		cout << square.get(x, y) << " ";
-			// 	}
-			// 	cout << endl;
-			// }
-			// cout << endl;
-
-            sendLatinSquare(square, i, 0);
-            workersDispatched++;
-        }
-
-        // Collect the results. A worker will denote that it is done by
-        //   sending back an empty latin square (all -1s).
-        while (workersDispatched != 0) {
-            square = receiveLatinSquare(size, MPI_ANY_SOURCE, 0);
-
-			// cout << "Received square from worker." << endl;
-			// for (int x = 0; x < square.getSize(); x++) {
-			// 	for (int y = 0; y < square.getSize(); y++) {
-			// 		cout << square.get(x, y) << " ";
-			// 	}
-			// 	cout << endl;
-			// }
-			// cout << endl;
-
-            if (square.isFinished()) {
-                count++;
-
-                // --------------------------------------------------------------------------------------
-                //
-                // TO DO: Figure out file writing for the output.
-                // For now, do nothing.
-                //
-                // --------------------------------------------------------------------------------------
-
-            } else {
-				// If the square received is empty, then the worker finished.
-                if (square.isEmpty()) {
-                    workersDispatched--;
-                } else {
-					queue.push(square);
-				}
-            }
-
-			// cout << "Queue isEmpty: " << queue.isEmpty() << endl;
-        }
-    }
-
-    // The entire queue is finished, that should mean all have been processed.
-    //   The coordinator needs to shut down the workers at this point. The
-    //   workers have already started listening for their next work, sending
-    //   an empty latin square can signal to stop.
-    square = LatinSquare(size);
-    for (int i = 1; i < worldSize; i++) {
-        sendLatinSquare(square, i, 0);
-    }
-
-    // All of them should be stopping or stopped, so this is safe to
-    //   return to clean up.
-
-    cout << count << " reduced latin squares." << endl;
-}
-
-void worker(int size) {
-    // Receive a square from the coordinator.
-    LatinSquare square = receiveLatinSquare(size, 0, 0);
-
-	// cout << "Received square from coordinator." << endl;
-	// for (int x = 0; x < square.getSize(); x++) {
-	// 	for (int y = 0; y < square.getSize(); y++) {
-	// 		cout << square.get(x, y) << " ";
-	// 	}
-	// 	cout << endl;
-	// }
-	// cout << endl;
-
-    // Start a loop that runs until an empty latin square is received.
-    while (!square.isEmpty()) {
-        // Find the first unfinished row.
-        int rowCoordinate = square.getFirstUnfinishedRowCoordinate();
-
-        // Since the validity is being checked, may as well generate all rows
-        //   and check what works. It's easier. So create a row to permute over.
-        vector<int> row;
-
-        for (int i = 0; i < size; i++) {
-            row.push_back(i);
-        }
-
-        // std::next_permutation, turns out, is perfect for permutations.
-        //   Who could have guessed that?
-        do {
-            for (int i = 0; i < size; i++) {
-                square.set(rowCoordinate, i, row[i]);
-            }
-
-			// cout << "Testing square." << endl;
-			// for (int x = 0; x < square.getSize(); x++) {
-			// 	for (int y = 0; y < square.getSize(); y++) {
-			// 		cout << square.get(x, y) << " ";
-			// 	}
-			// 	cout << endl;
-			// }
-			// cout << endl;
-
-            // Check if square is valid.
-            if (square.isValid()) {
-                sendLatinSquare(square, 0, 0);
-            }
-        } while (std::next_permutation(row.begin(), row.end()));
-
-        // Get a new square to work on. Alert the coordinator by sending an
-        //   empty latin square.
-        square = LatinSquare(size);
-        sendLatinSquare(square, 0, 0);
-
-        // Receive the new square.
-        square = receiveLatinSquare(size, 0, 0);
-    }
-
-    // An empty square was encountered. This should only happen if the
-    //   coordinator has signaled a stop. This can return safely to clean up.
-}
-
-LatinSquare receiveLatinSquare(int size, int source, int tag) {
-    // Create a vector to fill the data into.
-    vector<int> vector;
-
-    // Resize it so it'll fit everything.
-    vector.resize(size * size);
-
-    // MPI Receive call.
-    MPI_Recv(vector.data(), vector.size(), MPI_INT, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-    // Construct a new latin square from the vector.
-    return LatinSquare(vector);
-}
-
-void sendLatinSquare(LatinSquare square, int dest, int tag) {
-    // Get the internal vector and send it.
-    MPI_Send(square.getBody().data(), square.getBody().size(), MPI_INT, dest, tag, MPI_COMM_WORLD);
+	MPI_Finalize();
 }
