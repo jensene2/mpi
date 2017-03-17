@@ -7,21 +7,11 @@
 #include <vector>
 #include <sstream>
 
-// #include "latinsquare.c"
-// #include "queue.c"
-
 #include "coordinator.c"
 #include "receiver.c"
 #include "worker.c"
 
 using namespace std;
-
-// LatinSquare receiveLatinSquare(int size, int source, int tag);
-// void sendLatinSquare(LatinSquare square, int source, int tag);
-// void coordinator(int size, int worldSize);
-// void worker(int size);
-// void clean();
-// void setup();
 
 int main(int argc, char *argv[]) {
 	// Creates a char array, aka a string.
@@ -34,12 +24,16 @@ int main(int argc, char *argv[]) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
 	MPI_Comm_size(MPI_COMM_WORLD, &worldSize);
 
+	// printf ("Number of tasks = %d; My rank = %d; Running on %s;\n", worldSize, worldRank, hostname);
+
 	int numReceivers = worldSize / 10;
 	if (numReceivers == 0) {
 		numReceivers = 1;
 	}
+	// numReceivers = 2;
 
 	vector<int> receiverRanks, workerRanks;
+	workerRanks.push_back(0);
 	for (int i = 0; i < worldSize; i++) {
 		if (i <= numReceivers) {
 			receiverRanks.push_back(i);
@@ -89,7 +83,24 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 
-		Coordinator coordinator = Coordinator(size, &receivers);
+		// Check if the receivers world exists.
+		if (receivers == MPI_COMM_NULL) {
+			printf("Coordinator - The receiver world is null.\n");
+			return 1;
+		}
+
+		// Check if the workers world exists.
+		if (workers == MPI_COMM_NULL) {
+			printf("Coordinator - The worker world is null.\n");
+			return 1;
+		}
+
+		// int receiverRank, workerRank;
+		// MPI_Comm_size(receivers, &receiverRank);
+		// MPI_Comm_size(workers, &workerRank);
+		// printf ("Coordinator; Receiver rank = %d; Worker rank = %d;\n", receiverRank, workerRank);
+
+		Coordinator coordinator = Coordinator(size, &receivers, &workers);
 		coordinator.setup();
 		coordinator.run();
 		coordinator.shutdown();
@@ -104,12 +115,40 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 
+		// Check if the row world exists.
+		if (row == MPI_COMM_NULL) {
+			printf("The row world is null.\n");
+			return 1;
+		}
+
 		if (worldRank <= numReceivers) {
+			// Check if the receiver world exists.
+			if (receivers == MPI_COMM_NULL) {
+				printf("Receiver - The receiver world is null.\n");
+				return 1;
+			}
+
+			// int receiverRank, rowRank;
+			// MPI_Comm_size(receivers, &receiverRank);
+			// MPI_Comm_size(row, &rowRank);
+			// printf ("Receiver; Rank = %d; Receiver rank = %d; Row rank = %d;\n", worldRank, receiverRank, rowRank);
+
 			Receiver receiver = Receiver(size, &receivers, &row);
 			receiver.run();
 			receiver.shutdown();
 		} else {
-			Worker worker = Worker(size, &row);
+			// Check if the workers world exists.
+			if (workers == MPI_COMM_NULL) {
+				printf("Worker - The worker world is null.\n");
+				return 1;
+			}
+
+			// int rowRank, workerRank;
+			// MPI_Comm_size(row, &rowRank);
+			// MPI_Comm_size(workers, &workerRank);
+			// printf ("Worker; Rank = %d; Workers rank = %d; Row rank = %d;\n", worldRank, workerRank, rowRank);
+
+			Worker worker = Worker(size, &workers, &row);
 			worker.run();
 			worker.shutdown();
 		}

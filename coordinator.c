@@ -11,19 +11,23 @@
 #include "queue.c"
 #endif
 
+#include <chrono>
+#include <thread>
+
 using namespace std;
 
 class Coordinator {
-	MPI_Comm *receivers;
-	int receiverSize, worldSize;
+	MPI_Comm *receivers, *workers;
+	int receiverSize, workerSize;
 	int size;
 	int count;
 public:
-	Coordinator(int size, MPI_Comm *receivers) {
+	Coordinator(int size, MPI_Comm *receivers, MPI_Comm *workers) {
 		MPI_Comm_size(*receivers, &this->receiverSize);
-		MPI_Comm_size(MPI_COMM_WORLD, &this->worldSize);
+		MPI_Comm_size(*workers, &this->workerSize);
 
 		this->receivers = receivers;
+		this->workers = workers;
 
 		this->size = size;
 		this->count = 0;
@@ -39,7 +43,7 @@ public:
 
 		// Send the halter square to the workers. If the worker is rank #1
 		//   in its row, it will pass it on to the row's receiver.
-		for (int i = this->receiverSize; i < this->worldSize; i++) {
+		for (int i = 1; i < this->workerSize; i++) {
 			this->send(square, i);
 		}
 
@@ -66,18 +70,18 @@ public:
 		queue.push(square);
 
 		while (!queue.isEmpty()) {
-
 			int workersDispatched = 0;
 
 			// Dispatch workers until the queue is either empty or every
 			//   worker has been given a job.
-			for (int i = this->receiverSize; !queue.isEmpty() && i < this->worldSize; i++) {
+			for (int i = 1; !queue.isEmpty() && i < this->workerSize; i++) {
 				// Receive a new square from the queue.
 				square = queue.get();
 
 				// If an empty one got into the queue, just skip it. This
 				//   isn't something that should happen, but be safe.
 				if (square.isEmpty()) {
+					printf("Empty square discovered in queue.");
 					continue;
 				}
 
@@ -86,6 +90,8 @@ public:
 				workersDispatched++;
 			}
 
+			// printf("%d workers dispatched.\n", workersDispatched);
+
 			// While there are workers still working, receive squares from
 			//   the receivers.
 			while (workersDispatched != 0) {
@@ -93,6 +99,7 @@ public:
 
 				// An empty square means a worker finished.
 				if (square.isEmpty()) {
+					// printf("Empty received.\n");
 					workersDispatched--;
 				} else {
 					this->count++;
@@ -125,7 +132,7 @@ public:
 
 	void send(LatinSquare square, int dest) {
 		// Get the internal vector and send it to any worker.
-		MPI_Send(square.getBody().data(), square.getBody().size(), MPI_INT, dest, 1, MPI_COMM_WORLD);
+		MPI_Send(square.getBody().data(), square.getBody().size(), MPI_INT, dest, 1, *this->workers);
 	}
 };
 

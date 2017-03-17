@@ -7,11 +7,12 @@
 using namespace std;
 
 class Worker {
-	MPI_Comm *row;
+	MPI_Comm *workers, *row;
 	int rowRank;
 	int size;
 public:
-	Worker(int size, MPI_Comm *row) {
+	Worker(int size, MPI_Comm *workers, MPI_Comm *row) {
+		this->workers = workers;
 		this->row = row;
 
 		MPI_Comm_rank(*row, &this->rowRank);
@@ -75,7 +76,7 @@ public:
 		vector.resize(this->size * this->size);
 
 		// Receive data from the coordinator.
-		MPI_Recv(vector.data(), vector.size(), MPI_INT, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+		MPI_Recv(vector.data(), vector.size(), MPI_INT, 0, 1, *this->workers, MPI_STATUS_IGNORE);
 
 		// Construct a latin square from the vector.
 		return LatinSquare(vector);

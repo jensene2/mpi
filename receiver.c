@@ -35,7 +35,9 @@ public:
 		Queue queue = Queue(this->receiverRank);
 
 		while (!square.isHalter()) {
-			if (square.isFinished() || square.isEmpty()) {
+			if (square.isFinished()) {
+				this->send(square);
+			} else if (square.isEmpty()) {
 				this->send(square);
 			} else {
 				queue.push(square);
