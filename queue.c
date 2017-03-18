@@ -83,15 +83,32 @@ public:
 				}
 
 				inputFile.close();
+
+				// If the file is empty, it's probably still being written to.
+				//   Just continue onto the next file in the loop.
+				if (v.size() == 0) {
+					continue;
+				}
+
 				remove(filename);
 				break;
 			}
 
 			closedir(d);
 
+			// So, there's a chance that the last file checked was empty
+			//   at the time. Check if the vector is empty and if it is,
+			//   call this recursively to have it check the files again.
+			if (v.size() == 0) {
+				// Consider sleeping here.
+				return this->get();
+			}
+
 			return LatinSquare(v);
 		}
 
+		// This should be handled in some way.
+		printf("Directory could not be opened when getting from queue.\n");
 		return LatinSquare(1);
 	}
 
