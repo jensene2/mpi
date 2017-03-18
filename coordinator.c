@@ -81,7 +81,15 @@ public:
 				// If an empty one got into the queue, just skip it. This
 				//   isn't something that should happen, but be safe.
 				if (square.isEmpty()) {
-					printf("Empty square discovered in queue.");
+					printf("Empty square discovered in queue.\n");
+					printf("Printing square to verify.\n");
+					for (int x = 0; x < square.getSize(); x++) {
+						for (int y = 0; y < square.getSize(); y++) {
+							cout << square.get(x, y) << " ";
+						}
+						cout << endl;
+					}
+					cout << endl;
 					continue;
 				}
 

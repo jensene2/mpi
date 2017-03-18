@@ -40,7 +40,13 @@ public:
 			} else if (square.isEmpty()) {
 				this->send(square);
 			} else {
-				queue.push(square);
+				queue.push(square); // HERE <-------------------------------------------------------------------
+				// Somehow empty squares have the chance of getting here.
+				// This should not be possible. It seems to come at the end.
+				//   Maybe call date somehow and append that to the "Empty ..."
+				//   message?
+				// Possibly also do a check again to see if it is empty here.
+				//   It means the receivers are slower, but whatever.
 			}
 
 			square = this->receive();
