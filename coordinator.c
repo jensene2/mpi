@@ -30,6 +30,16 @@ public:
 
 		this->size = size;
 		this->count = 0;
+
+		char filename[40];
+		sprintf(filename, "latin_squares_%d.txt", size);
+		this->outputFile.open(filename, fstream::in | fstream::out | fstream:trunc);
+
+		if (this->outputFile.is_open()) {
+			printf("Output file opened.\n");
+		} else {
+			printf("Unable to open output file.\n");
+		}
 	}
 
 	void setup() {
@@ -52,6 +62,8 @@ public:
 
 	void clean() {
 		cleanQueue();
+
+		this->outputFile.close();
 	}
 
 	void run() {
@@ -110,6 +122,16 @@ public:
 					workersDispatched--;
 				} else {
 					this->count++;
+
+					if (this->outputFile.is_open()) {
+						for (int x = 0; x < this->size; x++) {
+							for (int y = 0; y < this->size; y++) {
+								this->outputFile << square.get(x, y);
+							}
+							this->outputFile << endl;
+						}
+						this->outputFile << endl;
+					}
 
 					// --------------------------------------------
 					//
