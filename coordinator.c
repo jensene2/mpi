@@ -11,9 +11,6 @@
 #include "queue.c"
 #endif
 
-#include <chrono>
-#include <thread>
-
 using namespace std;
 
 class Coordinator {
@@ -21,6 +18,8 @@ class Coordinator {
 	int receiverSize, workerSize;
 	int size;
 	int count;
+
+	fstream outputFile;
 public:
 	Coordinator(int size, MPI_Comm *receivers, MPI_Comm *workers) {
 		MPI_Comm_size(*receivers, &this->receiverSize);
